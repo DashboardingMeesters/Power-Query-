@@ -1,0 +1,70 @@
+let
+  Bron = Excel.CurrentWorkbook(){[Name = "Tabel1"]}[Content], 
+  TypeChange = Table.TransformColumnTypes(Bron, {{"Kolom1", type text}}), 
+  Header = Table.PromoteHeaders(TypeChange, [PromoteAllScalars = true]), 
+  TypeChange1 = Table.TransformColumnTypes(Header, {{"Original Text", type text}}), 
+  AddCOl = Table.AddColumn(
+    TypeChange1, 
+    "Aangepast", 
+    each Table.AddColumn(
+      Table.AddColumn(
+        Table.ExpandTableColumn(
+          Table.NestedJoin(
+            Table.AddColumn(
+              Table.Sort(
+                Table.AddIndexColumn(
+                  Table.FromList(
+                    Text.SplitAny([Original Text], " "), 
+                    Splitter.SplitByNothing(), 
+                    null, 
+                    null, 
+                    ExtraValues.Error
+                  ), 
+                  "Index", 
+                  1, 
+                  1
+                ), 
+                {"Index"}
+              ), 
+              "Test", 
+              each 
+                if Text.Contains([Column1], ",") then
+                  Text.Start([Column1], Text.Length(Text.BeforeDelimiter([Column1], ",")))
+                else if Text.Contains([Column1], ".") then
+                  Text.Start([Column1], Text.Length(Text.BeforeDelimiter([Column1], ".")))
+                else if Text.Contains([Column1], "'") then
+                  Text.Start([Column1], Text.Length(Text.BeforeDelimiter([Column1], "'")))
+                else
+                  [Column1]
+            ), 
+            {"Test"}, 
+            LookUpTable, 
+            {"From"}, 
+            "MergedTable"
+          ), 
+          "MergedTable", 
+          {"To"}, 
+          {"To"}
+        ), 
+        "NewCol", 
+        each if [To] = null then [Column1] else [To]
+      ), 
+      "SeperatorSearch", 
+      each 
+        if Text.Contains([Column1], ",") then
+          [To] & ","
+        else if Text.Contains([Column1], ".") then
+          [To] & "."
+        else if Text.Contains([Column1], "'") then
+          [To] & "'" & Text.AfterDelimiter([Column1], "'")
+        else
+          [NewCol]
+    )
+  ), 
+  FinalCol = Table.AddColumn(
+    AddCOl, 
+    "CombinedText", 
+    each Text.Combine([Aangepast][SeperatorSearch], " ")
+  )
+in
+  FinalCol
